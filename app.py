@@ -3,7 +3,7 @@ import pandas as pd  # type: ignore
 import altair as alt  # type: ignore
 from datetime import datetime
 import base64
-from fpdf import FPDF  # type: ignore
+from fpdf import FPDF # type: ignore
 import json
 import requests  # type: ignore
 import sqlite3
