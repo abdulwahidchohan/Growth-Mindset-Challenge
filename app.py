@@ -3,7 +3,6 @@ import pandas as pd  # type: ignore
 import altair as alt  # type: ignore
 from datetime import datetime
 import base64
-from fpdf import FPDF
 import json
 import requests  # type: ignore
 import sqlite3
@@ -57,34 +56,6 @@ def hash_email(email):
 def validate_email(email):
     regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
     return re.fullmatch(regex, email)
-
-# PDF Generation Class
-class PDFReport(FPDF):
-    def header(self):
-        logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
-        if os.path.exists(logo_path):
-            self.image(logo_path, 10, 8, 25)  # Add company logo
-        self.set_font('Arial', 'B', 15)
-        self.cell(80)
-        self.cell(30, 10, 'Survey Report', 0, 0, 'C')
-        self.ln(20)
-
-    def footer(self):
-        self.set_y(-15)
-        self.set_font('Arial', 'I', 8)
-        self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
-
-# Load Image with Error Handling
-def load_image(image_path):
-    """Load an image with error handling."""
-    if not os.path.exists(image_path):
-        logging.error(f"Image file not found: {image_path}")
-        return None
-    try:
-        return Image.open(image_path)
-    except Exception as e:
-        logging.error(f"Error loading image: {e}")
-        return None
 
 # Load Lottie Animation from URL
 def load_lottie(url: str):
@@ -199,31 +170,9 @@ def main():
             conn.commit()
             conn.close()
             
-            # Generate PDF Report
-            pdf = PDFReport()
-            pdf.add_page()
-            pdf.set_font("Arial", size=12)
-            pdf.cell(200, 10, "Professional Survey Report", ln=True, align='C')
-            pdf.ln(10)
-            
-            for key, value in st.session_state.survey_data.items():
-                pdf.cell(0, 10, f"{key.title()}: {value}", ln=True)
-            
-            report_bytes = pdf.output(dest="S").encode("latin1")
-            base64_pdf = base64.b64encode(report_bytes).decode()
-            
             # Success Message
             st.success("Submission Successful!")
             st_lottie(load_lottie("https://assets9.lottiefiles.com/packages/lf20_sk5h1kfn.json"), height=200)
-            
-            # Download Button
-            st.markdown(f'''
-            <a href="data:application/pdf;base64,{base64_pdf}" download="professional_survey_report.pdf">
-                <button style="background-color: #4CAF50; color: white; padding: 14px 20px; border: none; border-radius: 4px;">
-                    Download Professional Report
-                </button>
-            </a>
-            ''', unsafe_allow_html=True)
 
 # Entry Point
 if __name__ == "__main__":
