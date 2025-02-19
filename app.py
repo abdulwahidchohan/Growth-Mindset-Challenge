@@ -2,12 +2,12 @@ import streamlit as st # type: ignore
 import pandas as pd # type: ignore
 import numpy as np # type: ignore
 import altair as alt # type: ignore
-import time
-import json
+import time # type: ignore
+import json # type: ignore
 import requests # type: ignore
-from streamlit_lottie import st_lottie  # pip install streamlit-lottie # type: ignore
+from streamlit_lottie import st_lottie # type: ignore
 from streamlit.components.v1 import html # type: ignore
-from sklearn.ensemble import RandomForestRegressor  # pip install scikit-learn # type: ignore
+from sklearn.ensemble import RandomForestRegressor # type: ignore
 
 # Configuration
 st.set_page_config(
