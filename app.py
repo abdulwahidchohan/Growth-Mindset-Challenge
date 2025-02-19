@@ -1,255 +1,230 @@
-import streamlit as st # type: ignore
-import pandas as pd # type: ignore
-import numpy as np # type: ignore
-import altair as alt # type: ignore
-import time # type: ignore
-import json # type: ignore
-import requests # type: ignore
-from streamlit_lottie import st_lottie # type: ignore
-from streamlit.components.v1 import html # type: ignore
-from sklearn.ensemble import RandomForestRegressor # type: ignore
+import streamlit as st  # type: ignore
+import pandas as pd  # type: ignore
+import altair as alt  # type: ignore
+from datetime import datetime
+import base64
+from fpdf import FPDF  # type: ignore
+import json
+import requests  # type: ignore
+import sqlite3
+import re
+import hashlib
+from streamlit_lottie import st_lottie  # type: ignore
+from PIL import Image  # type: ignore
+import os
+from dotenv import load_dotenv  # type: ignore
+import logging
+
+# Load environment variables
+load_dotenv()
 
 # Configuration
 st.set_page_config(
-    page_title="Ultimate Analytics Dashboard",
-    page_icon="🚀",
+    page_title="Enterprise Survey Platform",
+    page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Performance optimizations
-@st.cache_data
+# Initialize logging
+logging.basicConfig(level=logging.INFO)
+
+# Database Initialization
+def init_db():
+    conn = sqlite3.connect('survey.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS responses
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  full_name TEXT,
+                  email TEXT,
+                  age INTEGER,
+                  country TEXT,
+                  interests TEXT,
+                  satisfaction INTEGER,
+                  ai_interest TEXT,
+                  improvement_feedback TEXT,
+                  submission_date TIMESTAMP,
+                  consent BOOLEAN)''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# Security Functions
+def hash_email(email):
+    return hashlib.sha256(email.encode()).hexdigest()
+
+def validate_email(email):
+    regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
+    return re.fullmatch(regex, email)
+
+# PDF Generation Class
+class PDFReport(FPDF):
+    def header(self):
+        logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
+        if os.path.exists(logo_path):
+            self.image(logo_path, 10, 8, 25)  # Add company logo
+        self.set_font('Arial', 'B', 15)
+        self.cell(80)
+        self.cell(30, 10, 'Survey Report', 0, 0, 'C')
+        self.ln(20)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('Arial', 'I', 8)
+        self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
+
+# Load Image with Error Handling
+def load_image(image_path):
+    """Load an image with error handling."""
+    if not os.path.exists(image_path):
+        logging.error(f"Image file not found: {image_path}")
+        return None
+    try:
+        return Image.open(image_path)
+    except Exception as e:
+        logging.error(f"Error loading image: {e}")
+        return None
+
+# Load Lottie Animation from URL
 def load_lottie(url: str):
-    return requests.get(url).json()
-
-@st.cache_data
-def heavy_computation(data):
-    time.sleep(1)  # Simulate heavy processing
-    return data * np.random.rand(1000, 1000)
-
-# Lottie Animations
-lottie_loading = load_lottie("https://assets4.lottiefiles.com/packages/lf20_raiw2hpe.json")
-lottie_success = load_lottie("https://assets4.lottiefiles.com/packages/lf20_aukcdea4.json")
-
-# Custom CSS with Animations
-st.markdown("""
-    <style>
-        @keyframes fadeIn {
-            0% { opacity: 0; transform: translateY(20px); }
-            100% { opacity: 1; transform: translateY(0); }
-        }
-        
-        .animated-section {
-            animation: fadeIn 0.8s ease-out;
-            padding: 2rem;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin: 1rem 0;
-        }
-        
-        .stButton>button {
-            transition: all 0.3s ease;
-            border-radius: 8px !important;
-        }
-        
-        .stButton>button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-        }
-        
-        .metric-card {
-            background: linear-gradient(145deg, #6a11cb 0%, #2575fc 100%);
-            color: white;
-            padding: 1.5rem;
-            border-radius: 12px;
-            transform: perspective(1000px) rotateX(10deg);
-            transition: transform 0.4s ease;
-        }
-        
-        .metric-card:hover {
-            transform: perspective(1000px) rotateX(0deg);
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-# Session State Management
-if 'submit_count' not in st.session_state:
-    st.session_state.submit_count = 0
-
-# Custom JavaScript Components
-def scroll_to_section(section_id):
-    html(f"""
-        <script>
-            document.getElementById('{section_id}').scrollIntoView({{
-                behavior: 'smooth'
-            }});
-        </script>
-    """)
-
-# AI-Powered Prediction Component
-@st.cache_data
-def train_model(data):
-    X = np.random.rand(100, 5)
-    y = np.random.rand(100)
-    model = RandomForestRegressor()
-    model.fit(X, y)
-    return model
-
-# Real-time Data Updates
-class RealTimeData:
-    def __init__(self):
-        self.data = pd.DataFrame({
-            'time': pd.date_range('2023-01-01', periods=100, freq='D'),
-            'value': np.random.randn(100).cumsum()
-        })
-    
-    def update(self):
-        new_row = pd.DataFrame({
-            'time': [self.data['time'].iloc[-1] + pd.Timedelta(days=1)],
-            'value': [self.data['value'].iloc[-1] + np.random.randn()]
-        })
-        self.data = pd.concat([self.data, new_row], ignore_index=True)
-        return self.data
-
-# Initialize real-time data
-rt_data = RealTimeData()
+    r = requests.get(url)
+    if r.status_code != 200:
+        return None
+    return r.json()
 
 # Main App
-st.title("🚀 Next-Gen Analytics Dashboard")
-st.markdown("---")
+def main():
+    # Session State Initialization
+    if 'survey_data' not in st.session_state:
+        st.session_state.survey_data = {}
+    if 'consent_given' not in st.session_state:
+        st.session_state.consent_given = False
 
-# Dashboard Overview
-with st.container():
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown('<div class="metric-card"><h3>Active Users</h3><h1>📈 24.5K</h1></div>', 
-                    unsafe_allow_html=True)
-    with col2:
-        st.markdown('<div class="metric-card"><h3>Revenue</h3><h1>💰 $1.2M</h1></div>', 
-                    unsafe_allow_html=True)
-    with col3:
-        st.markdown('<div class="metric-card"><h3>Engagement</h3><h1>🔥 89%</h1></div>', 
-                    unsafe_allow_html=True)
-
-st.markdown("---")
-
-# Interactive Section
-with st.container():
-    st.header("📊 Real-Time Analytics")
-    placeholder = st.empty()
-    
-    # Animation for real-time updates
-    with placeholder.container():
-        for _ in range(3):
-            data = rt_data.update()
-            chart = alt.Chart(data).mark_line().encode(
-                x='time:T',
-                y='value:Q',
-                color=alt.value('#4C78A8')
-            ).properties(height=400)
-            st.altair_chart(chart, use_container_width=True)
-            time.sleep(1)
-
-# AI Prediction Section
-with st.container():
-    st.markdown('<div id="predictions" class="animated-section">', unsafe_allow_html=True)
-    st.header("🤖 AI-Powered Predictions")
-    model = train_model(np.random.rand(100, 5))
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        input_params = {
-            'feature1': st.slider("Feature 1", 0.0, 1.0, 0.5),
-            'feature2': st.slider("Feature 2", 0.0, 1.0, 0.5),
-            'feature3': st.slider("Feature 3", 0.0, 1.0, 0.5)
-        }
-        
-    with col2:
-        prediction = model.predict([[input_params['feature1'], 
-                                   input_params['feature2'],
-                                   input_params['feature3'], 
-                                   0.5, 0.5]])
-        st.markdown(f"""
-            <div style="padding: 2rem; background: #f8f9fa; border-radius: 12px;">
-                <h3 style="color: #2575fc;">Prediction Result</h3>
-                <h1 style="font-size: 2.5rem;">{prediction[0]:.2f}</h1>
+    # GDPR Consent Banner
+    if not st.session_state.consent_given:
+        with st.container():
+            st.markdown("""
+            <div style='background-color: #f8f9fa; padding: 10px; border-radius: 5px;'>
+                <h3>Data Collection Consent</h3>
+                <p>We use cookies to improve your experience. By continuing you agree to our 
+                <a href='#'>Privacy Policy</a> and data collection practices.</p>
             </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# Advanced Features
-with st.container():
-    st.markdown('<div class="animated-section">', unsafe_allow_html=True)
-    st.header("✨ Premium Features")
-    
-    tab1, tab2, tab3 = st.tabs(["3D Visualization", "Data Explorer", "Settings"])
-    
-    with tab1:
-        st.write("Interactive 3D Plot (Requires WebGL)")
-        # Placeholder for 3D visualization
-        st.write("🚧 3D Visualization Coming Soon!")
-    
-    with tab2:
-        st.header("🔍 Data Explorer")
-        uploaded_file = st.file_uploader("Upload Dataset", type=["csv", "json"])
-        if uploaded_file:
-            data = pd.read_csv(uploaded_file)
-            st.dataframe(data.style.highlight_max(axis=0), use_container_width=True)
+            """, unsafe_allow_html=True)
             
-            # Performance-heavy operation with progress
-            with st.spinner("Optimizing data..."):
-                result = heavy_computation(data.values)
-                st.success(f"Processed matrix: {result.shape}")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Accept"):
+                    st.session_state.consent_given = True
+            with col2:
+                if st.button("Decline"):
+                    st.stop()
+
+    # Main Survey Content
+    st.title("📈 Enterprise Demographic Survey")
     
-    with tab3:
-        st.header("⚙️ Advanced Settings")
-        st.checkbox("Enable GPU Acceleration")
-        st.checkbox("Enable Real-time Sync")
-        st.checkbox("Enable Predictive Analytics")
+    # Progress Bar
+    progress = st.session_state.get('progress', 0)
+    st.progress(progress)
     
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Step 1: Basic Information
+    if progress < 0.33:
+        with st.form("basic_info"):
+            st.header("Basic Information")
+            email = st.text_input("Work Email*")
+            if email and not validate_email(email):
+                st.error("Please enter a valid work email address")
+            
+            st.session_state.survey_data['full_name'] = st.text_input("Full Name*")
+            st.session_state.survey_data['age'] = st.slider("Age*", 18, 100)
+            st.session_state.survey_data['company'] = st.text_input("Company Name*")
+            
+            if st.form_submit_button("Next"):
+                if all([st.session_state.survey_data.get(k) for k in ['full_name', 'age', 'company']]):
+                    st.session_state.survey_data['email'] = email  # Save email input
+                    st.session_state.progress = 0.33
+                    st.experimental_rerun()
+                else:
+                    st.error("Please fill all required fields")
 
-# Lottie Animation Section
-with st.container():
-    st.header("🎉 Interactive Animation")
-    col1, col2 = st.columns(2)
-    with col1:
-        st_lottie(lottie_loading, height=300, key="loading")
-    with col2:
-        st_lottie(lottie_success, height=300, key="success")
+    # Step 2: Professional Details
+    if 0.33 <= progress < 0.66:
+        with st.form("professional_details"):
+            st.header("Professional Details")
+            st.session_state.survey_data['industry'] = st.selectbox(
+                "Industry*",
+                ["Technology", "Finance", "Healthcare", "Education", "Other"]
+            )
+            st.session_state.survey_data['experience'] = st.slider(
+                "Years of Experience*", 0, 50
+            )
+            st.session_state.survey_data['skills'] = st.multiselect(
+                "Technical Skills",
+                ["Python", "SQL", "Machine Learning", "Data Analysis", "Cloud Computing"]
+            )
+            
+            if st.form_submit_button("Next"):
+                st.session_state.progress = 0.66
+                st.experimental_rerun()
 
-# Custom JavaScript Controls
-st.markdown("""
-    <div class="animated-section">
-        <h2>🎮 Interactive Controls</h2>
-        <button onclick="alert('Custom JavaScript Activated!')" 
-                style="padding: 10px 20px; background: #2575fc; color: white; border: none; border-radius: 8px;">
-            Trigger Custom Action
-        </button>
-    </div>
-""", unsafe_allow_html=True)
+    # Step 3: Final Review & Submission
+    if progress >= 0.66:
+        st.header("Review & Submit")
+        
+        # Data Review Table
+        review_df = pd.DataFrame.from_dict(
+            st.session_state.survey_data, 
+            orient='index', 
+            columns=['Responses']
+        )
+        st.table(review_df)
+        
+        # Terms of Service
+        terms = st.checkbox("I agree to the Terms of Service and Data Processing Agreement")
+        
+        if terms and st.button("Submit Survey"):
+            # Save to database
+            conn = sqlite3.connect('survey.db')
+            c = conn.cursor()
+            c.execute('''INSERT INTO responses 
+                      (full_name, email, age, country, interests, submission_date, consent)
+                      VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                      (st.session_state.survey_data['full_name'],
+                       hash_email(st.session_state.survey_data['email']),
+                       st.session_state.survey_data['age'],
+                       st.session_state.survey_data.get('country', ''),
+                       ','.join(st.session_state.survey_data.get('interests', [])),
+                       datetime.now(),
+                       True))
+            conn.commit()
+            conn.close()
+            
+            # Generate PDF Report
+            pdf = PDFReport()
+            pdf.add_page()
+            pdf.set_font("Arial", size=12)
+            pdf.cell(200, 10, "Professional Survey Report", ln=True, align='C')
+            pdf.ln(10)
+            
+            for key, value in st.session_state.survey_data.items():
+                pdf.cell(0, 10, f"{key.title()}: {value}", ln=True)
+            
+            report_bytes = pdf.output(dest="S").encode("latin1")
+            base64_pdf = base64.b64encode(report_bytes).decode()
+            
+            # Success Message
+            st.success("Submission Successful!")
+            st_lottie(load_lottie("https://assets9.lottiefiles.com/packages/lf20_sk5h1kfn.json"), height=200)
+            
+            # Download Button
+            st.markdown(f'''
+            <a href="data:application/pdf;base64,{base64_pdf}" download="professional_survey_report.pdf">
+                <button style="background-color: #4CAF50; color: white; padding: 14px 20px; border: none; border-radius: 4px;">
+                    Download Professional Report
+                </button>
+            </a>
+            ''', unsafe_allow_html=True)
 
-# Scroll Navigation
-st.markdown("---")
-col1, col2, col3 = st.columns(3)
-with col2:
-    if st.button("Scroll to Top"):
-        scroll_to_section("__root__")
-    if st.button("Scroll to Predictions"):
-        scroll_to_section("predictions")
-
-# Performance Monitoring
-with st.expander("Performance Metrics"):
-    st.write("⏱️ Load Time: 2.3s")
-    st.write("📦 Memory Usage: 245MB")
-    st.write("🚀 Frame Rate: 60 FPS")
-
-# Theme Switch
-st.sidebar.header("Settings")
-theme = st.sidebar.selectbox("Theme", ["Light", "Dark", "Cyberpunk"])
-st.sidebar.button("Optimize Performance 🔧")
-
-# Final Animation
-st.balloons()
+# Entry Point
+if __name__ == "__main__":
+    main()
