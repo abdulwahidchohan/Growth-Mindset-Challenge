@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pydeck as pdk
-import plotly.express as px
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.cluster import DBSCAN, KMeans
@@ -200,22 +199,35 @@ with tabs[0]:
         st.warning("Oh no! There's no data available for the map at the moment.")
 
 ###########################
-# Tab 2: Interactive Charts
+# Tab 2: Charts (Using Matplotlib and Seaborn)
 with tabs[1]:
     st.subheader("Dive into Interactive Charts")
-    hist_fig = px.histogram(filtered_data, x='magnitude', nbins=20,
-                            title="Distribution of Earthquake Magnitudes")
-    st.plotly_chart(hist_fig, use_container_width=True)
     
-    scatter_fig = px.scatter(filtered_data, x='depth', y='magnitude',
-                             title="How Depth and Magnitude Relate",
-                             labels={"depth": "Depth (km)", "magnitude": "Magnitude"})
-    st.plotly_chart(scatter_fig, use_container_width=True)
+    # Magnitude Distribution Histogram
+    st.write("**Distribution of Earthquake Magnitudes**")
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.histplot(filtered_data['magnitude'], bins=20, kde=True, ax=ax)
+    ax.set_xlabel("Magnitude")
+    ax.set_ylabel("Frequency")
+    st.pyplot(fig)
     
+    # Depth vs Magnitude Scatter Plot
+    st.write("**Depth vs Magnitude**")
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.scatterplot(data=filtered_data, x='depth', y='magnitude', ax=ax)
+    ax.set_xlabel("Depth (km)")
+    ax.set_ylabel("Magnitude")
+    st.pyplot(fig)
+    
+    # Weekly Earthquake Frequency
     if not filtered_data.empty:
+        st.write("**Weekly Earthquake Frequency**")
         ts_data = filtered_data.set_index('time').resample('W').size().reset_index(name='count')
-        line_fig = px.line(ts_data, x='time', y='count', title="Weekly Earthquake Frequency")
-        st.plotly_chart(line_fig, use_container_width=True)
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sns.lineplot(data=ts_data, x='time', y='count', ax=ax)
+        ax.set_xlabel("Time")
+        ax.set_ylabel("Number of Earthquakes")
+        st.pyplot(fig)
 
 ###########################
 # Tab 3: Cluster Analysis
