@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pydeck as pdk
-import plotly.express as px
+import plotly.express as px # type: ignore
 import plotly.figure_factory as ff
 from sklearn.cluster import DBSCAN, KMeans
 import seaborn as sns
