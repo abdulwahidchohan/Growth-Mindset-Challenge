@@ -3,10 +3,11 @@ import pandas as pd
 import numpy as np
 import pydeck as pdk
 import plotly.express as px
-import plotly.figure_factory as ff
-from sklearn.cluster import DBSCAN, KMeans
 import seaborn as sns
 import matplotlib.pyplot as plt
+from sklearn.cluster import DBSCAN, KMeans
+from sklearn.metrics.pairwise import haversine_distances
+from scipy.stats import pearsonr
 import requests
 from streamlit_lottie import st_lottie
 
@@ -108,12 +109,17 @@ else:
     np.random.seed(42)
     sample_size = 300
     regions = ["North America", "South America", "Asia", "Europe", "Africa", "Oceania"]
+    # Generate realistic earthquake locations along tectonic plates
+    tectonic_plates = [
+        (30, 120), (-20, -70), (40, -120), (-10, 150), (60, -150)
+    ]
+    plate_points = np.random.choice(len(tectonic_plates), sample_size)
     data = pd.DataFrame({
         'time': pd.date_range(start="2015-01-01", periods=sample_size, freq='W'),
-        'latitude': np.random.uniform(-90, 90, sample_size),
-        'longitude': np.random.uniform(-180, 180, sample_size),
+        'latitude': np.random.normal([tectonic_plates[i][0] for i in plate_points], 5),
+        'longitude': np.random.normal([tectonic_plates[i][1] for i in plate_points], 5),
         'depth': np.random.uniform(0, 700, sample_size),
-        'magnitude': np.random.uniform(2.5, 8.0, sample_size),
+        'magnitude': np.random.exponential(scale=2.5, size=sample_size) + 2.5,
         'region': np.random.choice(regions, sample_size)
     })
 
@@ -222,10 +228,17 @@ with tabs[2]:
         coords = filtered_data[['latitude', 'longitude']]
         
         if algorithm == "DBSCAN":
-            eps = st.slider("DBSCAN eps (degrees)", min_value=0.1, max_value=5.0, value=1.0, step=0.1)
+            eps_km = st.slider("Max distance (km)", 10, 1000, 100)
             min_samples = st.slider("DBSCAN min_samples", min_value=1, max_value=20, value=5, step=1)
             try:
-                cluster_model = DBSCAN(eps=eps, min_samples=min_samples).fit(coords)
+                # Convert to radians and use Haversine distance
+                coords_rad = np.radians(coords)
+                earth_radius_km = 6371
+                cluster_model = DBSCAN(
+                    eps=eps_km/earth_radius_km, 
+                    min_samples=min_samples, 
+                    metric='haversine'
+                ).fit(coords_rad)
                 cluster_labels = cluster_model.labels_
             except Exception as e:
                 st.error("Error with DBSCAN: " + str(e))
@@ -285,6 +298,11 @@ with tabs[3]:
     st.subheader("Statistics & Insights")
     st.write("**Here's a quick summary of your data:**")
     st.write(filtered_data.describe())
+    
+    # Correlation analysis
+    if not filtered_data.empty:
+        corr, p_value = pearsonr(filtered_data['depth'], filtered_data['magnitude'])
+        st.write(f"**Correlation between Depth and Magnitude:** {corr:.2f} (p-value: {p_value:.4f})")
     
     num_cols = filtered_data.select_dtypes(include=['float64', 'int64']).columns.tolist()
     if num_cols:
